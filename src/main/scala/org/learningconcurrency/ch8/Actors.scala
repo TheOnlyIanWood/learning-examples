@@ -85,7 +85,9 @@ object ActorsCountdown extends App {
 class DictionaryActor extends Actor {
   private val log = Logging(context.system, this)
   private val dictionary = mutable.Set[String]()
+
   def receive = uninitialized
+
   def uninitialized: PartialFunction[Any, Unit] = {
     case DictionaryActor.Init(path) =>
       val stream = getClass.getResourceAsStream(path)
@@ -93,6 +95,7 @@ class DictionaryActor extends Actor {
       for (w <- words.getLines) dictionary += w
       context.become(initialized)
   }
+
   def initialized: PartialFunction[Any, Unit] = {
     case DictionaryActor.IsWord(w) =>
       log.info(s"word '$w' exists: ${dictionary(w)}")
@@ -100,6 +103,7 @@ class DictionaryActor extends Actor {
       dictionary.clear()
       context.become(uninitialized)
   }
+
   override def unhandled(msg: Any) = {
     log.info(s"message $msg should not be sent in this state.")
   }
@@ -122,6 +126,8 @@ object ActorsBecome extends App {
   dict ! DictionaryActor.IsWord("program")
   Thread.sleep(1000)
   dict ! DictionaryActor.IsWord("balaban")
+  Thread.sleep(1000)
+  dict ! DictionaryActor.Init("/org/learningconcurrency/words.txt") // or /usr/share/dict/words
   Thread.sleep(1000)
   dict ! DictionaryActor.End
   Thread.sleep(1000)
@@ -146,7 +152,6 @@ class ParentActor extends Actor {
   }
 }
 
-
 class ChildActor extends Actor {
   val log = Logging(context.system, this)
   def receive = {
@@ -158,7 +163,6 @@ class ChildActor extends Actor {
     log.info("child stopped!")
   }
 }
-
 
 object ActorsHierarchy extends App {
   val parent = ourSystem.actorOf(Props[ParentActor], "parent")
@@ -209,20 +213,24 @@ object ActorsIdentify extends App {
 class LifecycleActor extends Actor {
   val log = Logging(context.system, this)
   var child: ActorRef = _
+
   def receive = {
     case num: Double  => log.info(s"got a double - $num")
     case num: Int     => log.info(s"got an integer - $num")
     case lst: List[_] => log.info(s"list - ${lst.head}, ...")
     case txt: String  => child ! txt
   }
+
   override def preStart(): Unit = {
     log.info("about to start")
     child = context.actorOf(Props[StringPrinter], "kiddo")
   }
+
   override def preRestart(reason: Throwable, msg: Option[Any]): Unit = {
     log.info(s"about to restart because of $reason, during message $msg")
     super.preRestart(reason, msg)
   }
+
   override def postRestart(reason: Throwable): Unit = {
     log.info(s"just restarted due to $reason")
     super.postRestart(reason)

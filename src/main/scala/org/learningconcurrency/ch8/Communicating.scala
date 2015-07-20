@@ -31,7 +31,8 @@ class Pingy extends Actor {
     case pongyRef: ActorRef =>
       implicit val timeout = Timeout(2 seconds)
       val future = pongyRef ? "ping"
-      pipe(future) to sender
+//      pipe(future) to sender
+      future pipeTo sender // NOTE same as above IAN
   }
 }
 
@@ -40,6 +41,7 @@ class Master extends Actor {
   val log = Logging(context.system, this)
   val pingy = ourSystem.actorOf(Props[Pingy], "pingy")
   val pongy = ourSystem.actorOf(Props[Pongy], "pongy")
+
   def receive = {
     case "start" =>
       pingy ! pongy
@@ -47,6 +49,7 @@ class Master extends Actor {
       log.info("got a pong back!")
       context.stop(self)
   }
+
   override def postStop() = log.info("master going down")
 }
 
@@ -96,9 +99,11 @@ class GracefulPingy extends Actor {
 
   def receive = {
     case GracefulPingy.CustomShutdown =>
+      log("asked to shutdown, will ask pongy to shutdown")
       context.stop(pongy)
     case Terminated(`pongy`) =>
-      context.stop(self)
+      log("pongy Terminated, will stop")
+      context.stop(self) // NOTE if this line is commented out then the graceful shutdown fails
   }
 }
 
